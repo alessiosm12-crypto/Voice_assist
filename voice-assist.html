@@ -288,21 +288,63 @@
     }
 
     function addRussianCommas(value) {
+      const introductoryWords = "например|кстати|впрочем|значит|итак|наконец|конечно|возможно|вероятно|кажется|пожалуйста|видимо|очевидно|по-моему|во-первых|во-вторых|с одной стороны|с другой стороны";
+      const relativeWords = "который|которая|которое|которые|которого|которой|которых|которому|которым|которыми|котором";
+      const subordinateWords = "что|чтобы|если|когда|пока|хотя|поскольку|где|куда|откуда|зачем|почему";
+      const compoundConjunctions = [
+        "потому что",
+        "так как",
+        "для того чтобы",
+        "несмотря на то что",
+        "из-за того что",
+        "перед тем как",
+        "после того как",
+        "в то время как",
+        "по мере того как"
+      ];
+
+      const protectedPhrases = [];
+      const protectedText = value.replace(
+        new RegExp(`(^|\\s)(${compoundConjunctions.join("|")})(?=$|\\s|[,.;:!?])`, "giu"),
+        (_match, prefix, phrase) => {
+          const token = `__compound_${protectedPhrases.length}__`;
+          protectedPhrases.push(phrase);
+          return `${prefix}${token}`;
+        }
+      );
+
+      return protectedText
+        .replace(/([^\s,.;:!?])\s+(а|но|однако|зато|поэтому)(?=$|\s|[,.;:!?])/giu, "$1, $2")
+        .replace(new RegExp(`([^\\s,.;:!?])\\s+(${introductoryWords})\\s+`, "giu"), "$1, $2, ")
+        .replace(new RegExp(`(^|[.!?]\\s+)(${introductoryWords})\\s+`, "giu"), "$1$2, ")
+        .replace(/([^\s,.;:!?])\s+(то есть)(?=$|\s|[,.;:!?])/giu, "$1, $2")
+        .replace(/([^\s,.;:!?])\s+(__compound_\d+__)(?=$|\s|[,.;:!?])/giu, "$1, $2")
+        .replace(new RegExp(`([^\\s,.;:!?])\\s+(${subordinateWords})(?=$|\\s|[,.;:!?])`, "giu"), "$1, $2")
+        .replace(new RegExp(`([^\\s,.;:!?])\\s+(${relativeWords})(?=$|\\s|[,.;:!?])`, "giu"), "$1, $2")
+        .replace(/(^|[.!?]\s+)(если[^.!?]*?)\s+(то)(?=$|\s|[,.;:!?])/giu, "$1$2, $3")
+        .replace(/([,;:]\s+)(если[^.!?]*?)\s+(то)(?=$|\s|[,.;:!?])/giu, "$1$2, $3")
+        .replace(/__compound_(\d+)__/g, (_, index) => protectedPhrases[Number(index)]);
+    }
+
+    function cleanPunctuation(value) {
       return value
-        .replace(/([^\s,.;:!?])\s+(но|однако|зато|поэтому|например|кстати|во-первых|во-вторых|впрочем)\b/giu, "$1, $2")
-        .replace(/([^\s,.;:!?])\s+(то есть)\b/giu, "$1, $2");
+        .replace(/\s+([,.;:!?])/g, "$1")
+        .replace(/([,.;:!?])(?=\S)/g, "$1 ")
+        .replace(/,\s*,+/g, ",")
+        .replace(/,\s*([.!?])/g, "$1")
+        .replace(/([.!?])\s+([,.;:!?])/g, "$1 ")
+        .replace(/\s+/g, " ")
+        .trim();
     }
 
     function autoEditText(value, finalize = true) {
       let text = normalize(value);
       if (!text) return "";
 
-      text = text
-        .replace(/\s+([,.;:!?])/g, "$1")
-        .replace(/([,.;:!?])(?=\S)/g, "$1 ")
-        .replace(/([.!?])\s+([,.;:!?])/g, "$1 ");
+      text = cleanPunctuation(text);
       text = addSoftBreaksBeforeCapitals(text);
       text = addRussianCommas(text);
+      text = cleanPunctuation(text);
       text = capitalizeSentences(text);
       if (finalize && !/[.!?]$/.test(text)) {
         text += ".";
