@@ -11,12 +11,12 @@ Voice assist opens a small dictation window with `Ctrl+Alt+D`.
 ## Use
 
 1. Press `Ctrl+Alt+D`.
-2. Click `Start dictation`.
+2. Dictation starts automatically when the window opens.
 3. Dictate text.
 4. Click `Done`.
 5. Paste the copied text anywhere with `Ctrl+V`.
 
-Inside the dictation window, `Ctrl+Shift+M` toggles recognition.
+Inside the dictation window, `Ctrl+Shift+M` toggles recognition. The `Start dictation` button is still available as a fallback if the browser blocks automatic start.
 
 ## Notes
 

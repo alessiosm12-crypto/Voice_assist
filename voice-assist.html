@@ -308,6 +308,10 @@
       setStatus("В этом браузере нет Web Speech API. Откройте окно в Chrome или Edge.", "error");
       startBtn.disabled = true;
       stopBtn.disabled = true;
+    } else {
+      window.addEventListener("load", () => {
+        window.setTimeout(startRecognition, 250);
+      });
     }
   </script>
 </body>
