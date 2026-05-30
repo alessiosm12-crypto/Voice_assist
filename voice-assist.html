@@ -7,27 +7,19 @@
   <title>Voice assist</title>
   <style>
     :root {
-      color-scheme: light dark;
-      --bg: #f7f7f4;
-      --text: #1e232b;
-      --muted: #626b78;
-      --line: #d8dce3;
-      --accent: #1668dc;
-      --accent-strong: #0d4fb3;
-      --danger: #b42318;
-      --ok: #1a7f37;
-    }
-
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --bg: #1c2027;
-        --text: #f3f5f8;
-        --muted: #aab2bf;
-        --line: #3b414c;
-        --accent: #78aefd;
-        --accent-strong: #9bc3ff;
-        --ok: #5cc26f;
-      }
+      color-scheme: dark;
+      --bg: #0e1117;
+      --panel: #171b24;
+      --panel-soft: #11151d;
+      --text: #f4f7fb;
+      --muted: #98a2b3;
+      --line: #2a3140;
+      --accent: #49c5a2;
+      --accent-strong: #68d9ba;
+      --accent-text: #06130f;
+      --danger: #ff7a7a;
+      --ok: #73e0ad;
+      --shadow: 0 24px 70px rgba(0, 0, 0, .42);
     }
 
     * {
@@ -45,59 +37,72 @@
     }
 
     main {
-      width: min(620px, calc(100vw - 28px));
+      width: min(680px, calc(100vw - 28px));
+      border: 1px solid rgba(255, 255, 255, .08);
+      border-radius: 16px;
+      background: rgba(23, 27, 36, .94);
+      box-shadow: var(--shadow);
+      padding: 24px;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: start;
+      margin-bottom: 18px;
     }
 
     h1 {
-      margin: 0 0 10px;
-      font-size: 24px;
-      font-weight: 650;
+      margin: 0 0 8px;
+      font-size: 26px;
+      font-weight: 700;
       letter-spacing: 0;
     }
 
     p {
-      margin: 0 0 16px;
+      margin: 0;
       color: var(--muted);
-      font-size: 15px;
-      line-height: 1.45;
+      font-size: 14px;
+      line-height: 1.5;
     }
 
-    .toolbar {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
+    .state {
+      display: inline-flex;
+      flex: 0 0 auto;
+      gap: 8px;
       align-items: center;
-      margin-bottom: 14px;
-    }
-
-    button {
-      min-height: 42px;
+      min-height: 34px;
       border: 1px solid var(--line);
-      border-radius: 7px;
-      background: transparent;
-      color: var(--text);
-      cursor: pointer;
-      font: 650 15px/1 "Segoe UI", system-ui, sans-serif;
-      padding: 0 14px;
+      border-radius: 999px;
+      background: var(--panel-soft);
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 650;
+      padding: 0 12px;
     }
 
-    button.primary {
-      border-color: var(--accent);
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--muted);
+    }
+
+    body.recording .state {
+      border-color: rgba(73, 197, 162, .45);
+      color: var(--ok);
+    }
+
+    body.recording .dot {
       background: var(--accent);
-      color: white;
-    }
-
-    button.primary:hover {
-      background: var(--accent-strong);
-    }
-
-    button:disabled {
-      cursor: not-allowed;
-      opacity: .55;
+      box-shadow: 0 0 0 5px rgba(73, 197, 162, .13);
     }
 
     #status {
       min-height: 44px;
+      margin-bottom: 16px;
+      color: var(--muted);
     }
 
     #status.error {
@@ -108,38 +113,140 @@
       color: var(--ok);
     }
 
-    #transcript {
-      min-height: 120px;
+    .toolbar {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    button {
+      min-height: 44px;
       border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 12px;
-      overflow-wrap: anywhere;
+      border-radius: 10px;
+      background: var(--panel-soft);
       color: var(--text);
-      font-size: 18px;
-      line-height: 1.35;
+      cursor: pointer;
+      font: 700 15px/1 "Segoe UI", system-ui, sans-serif;
+      padding: 0 14px;
+    }
+
+    button.primary {
+      border-color: transparent;
+      background: var(--accent);
+      color: var(--accent-text);
+    }
+
+    button.primary:hover {
+      background: var(--accent-strong);
+    }
+
+    button:hover:not(:disabled):not(.primary) {
+      border-color: #3b465c;
+      background: #1d2330;
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: .48;
+    }
+
+    #transcript {
+      min-height: 150px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #0d1118;
+      color: var(--text);
+      font-size: 19px;
+      line-height: 1.45;
+      overflow-wrap: anywhere;
+      padding: 16px;
       white-space: pre-wrap;
+    }
+
+    #transcript:empty::before {
+      content: "Текст появится здесь...";
+      color: #667085;
     }
 
     .interim {
       color: var(--muted);
     }
+
+    .hint {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    kbd {
+      min-width: 28px;
+      border: 1px solid var(--line);
+      border-bottom-color: #1d2330;
+      border-radius: 6px;
+      background: #111722;
+      color: var(--text);
+      font: 650 12px/1 "Segoe UI", system-ui, sans-serif;
+      padding: 5px 7px;
+      text-align: center;
+    }
+
+    @media (max-width: 560px) {
+      main {
+        padding: 18px;
+      }
+
+      .header {
+        display: block;
+      }
+
+      .state {
+        margin-top: 12px;
+      }
+
+      .toolbar {
+        grid-template-columns: 1fr;
+      }
+    }
   </style>
 </head>
 <body>
   <main>
-    <h1>Voice assist</h1>
-    <p id="status">Нажмите «Начать диктовку». Когда закончите, нажмите «Готово», и текст скопируется в буфер обмена.</p>
+    <div class="header">
+      <div>
+        <h1>Voice assist</h1>
+        <p>Диктовка запускается автоматически. Нажмите «Готово», чтобы скопировать текст в буфер обмена.</p>
+      </div>
+      <div class="state" aria-live="polite">
+        <span class="dot" aria-hidden="true"></span>
+        <span id="stateText">Ожидание</span>
+      </div>
+    </div>
+
+    <p id="status">Запускаю диктовку...</p>
+
     <div class="toolbar">
-      <button id="start" class="primary" type="button" aria-label="Начать голосовой ввод">Начать диктовку</button>
-      <button id="stop" type="button" aria-label="Остановить голосовой ввод" disabled>Остановить</button>
+      <button id="start" class="primary" type="button" aria-label="Начать голосовой ввод">Начать</button>
+      <button id="stop" type="button" aria-label="Остановить голосовой ввод" disabled>Пауза</button>
       <button id="done" type="button" aria-label="Скопировать текст и закрыть окно">Готово</button>
     </div>
+
     <div id="transcript" aria-live="polite"></div>
+
+    <div class="hint" aria-label="Горячие клавиши">
+      <span><kbd>Space</kbd> пауза/старт</span>
+      <span><kbd>Enter</kbd> готово</span>
+      <span><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>M</kbd> пауза/старт</span>
+    </div>
   </main>
 
   <script>
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const statusEl = document.querySelector("#status");
+    const stateTextEl = document.querySelector("#stateText");
     const transcriptEl = document.querySelector("#transcript");
     const startBtn = document.querySelector("#start");
     const stopBtn = document.querySelector("#stop");
@@ -152,6 +259,11 @@
 
     function normalize(value) {
       return value.replace(/\s+/g, " ").trim();
+    }
+
+    function setRecordingState(isRecording) {
+      document.body.classList.toggle("recording", isRecording);
+      stateTextEl.textContent = isRecording ? "Слушаю" : "Пауза";
     }
 
     function setStatus(message, mode = "") {
@@ -193,6 +305,8 @@
         setStatus("В этом браузере нет Web Speech API. Откройте окно в Chrome или Edge.", "error");
         startBtn.disabled = true;
         stopBtn.disabled = true;
+        setRecordingState(false);
+        stateTextEl.textContent = "Недоступно";
         return null;
       }
 
@@ -205,6 +319,7 @@
       instance.onstart = () => {
         startBtn.disabled = true;
         stopBtn.disabled = false;
+        setRecordingState(true);
         setStatus("Слушаю. Говорите по-русски, затем нажмите «Готово».", "ok");
       };
 
@@ -239,13 +354,14 @@
       instance.onend = () => {
         startBtn.disabled = false;
         stopBtn.disabled = true;
+        setRecordingState(false);
         if (shouldRun) {
           window.setTimeout(() => {
             try {
               instance.start();
             } catch {
               shouldRun = false;
-              setStatus("Диктовка остановлена браузером. Нажмите «Начать диктовку», чтобы продолжить.", "error");
+              setStatus("Диктовка остановлена браузером. Нажмите «Начать», чтобы продолжить.", "error");
             }
           }, 200);
         } else {
@@ -319,10 +435,13 @@
       }
     });
 
+    setRecordingState(false);
+
     if (!SpeechRecognition) {
       setStatus("В этом браузере нет Web Speech API. Откройте окно в Chrome или Edge.", "error");
       startBtn.disabled = true;
       stopBtn.disabled = true;
+      stateTextEl.textContent = "Недоступно";
     } else {
       window.addEventListener("load", () => {
         window.setTimeout(startRecognition, 250);
