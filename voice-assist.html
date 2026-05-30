@@ -267,8 +267,24 @@
       return value.replace(/(^|[.!?]\s+)([а-яёa-z])/giu, (_, prefix, letter) => `${prefix}${letter.toUpperCase()}`);
     }
 
-    function addSentenceBreaksBeforeCapitals(value) {
-      return value.replace(/([а-яёa-z0-9])\s+([А-ЯЁA-Z])/gu, "$1. $2");
+    function lowercaseFirst(value) {
+      return value ? `${value[0].toLowerCase()}${value.slice(1)}` : value;
+    }
+
+    function addSoftBreaksBeforeCapitals(value) {
+      return value.replace(/([а-яёa-z0-9])\s+([А-ЯЁA-Z][а-яёa-z]+)/gu, (match, previousChar, nextWord, offset, source) => {
+        const beforeBreak = source.slice(0, offset + 1);
+        const currentSegment = beforeBreak.split(/[.!?]/).pop().trim();
+        const wordCount = currentSegment ? currentSegment.split(/\s+/).length : 0;
+
+        if (wordCount >= 7) {
+          return `${previousChar}. ${nextWord}`;
+        }
+        if (wordCount >= 4) {
+          return `${previousChar}, ${lowercaseFirst(nextWord)}`;
+        }
+        return `${previousChar} ${lowercaseFirst(nextWord)}`;
+      });
     }
 
     function addRussianCommas(value) {
@@ -277,7 +293,7 @@
         .replace(/([^\s,.;:!?])\s+(то есть)\b/giu, "$1, $2");
     }
 
-    function autoEditText(value) {
+    function autoEditText(value, finalize = true) {
       let text = normalize(value);
       if (!text) return "";
 
@@ -285,10 +301,10 @@
         .replace(/\s+([,.;:!?])/g, "$1")
         .replace(/([,.;:!?])(?=\S)/g, "$1 ")
         .replace(/([.!?])\s+([,.;:!?])/g, "$1 ");
-      text = addSentenceBreaksBeforeCapitals(text);
+      text = addSoftBreaksBeforeCapitals(text);
       text = addRussianCommas(text);
       text = capitalizeSentences(text);
-      if (!/[.!?]$/.test(text)) {
+      if (finalize && !/[.!?]$/.test(text)) {
         text += ".";
       }
       return text;
@@ -299,12 +315,10 @@
       if (!cleanPhrase) return;
       if (!finalText) {
         finalText = cleanPhrase;
-      } else if (/[.!?]$/.test(finalText)) {
-        finalText = `${finalText} ${cleanPhrase}`;
       } else {
-        finalText = `${finalText}. ${cleanPhrase}`;
+        finalText = `${finalText} ${cleanPhrase}`;
       }
-      finalText = autoEditText(finalText);
+      finalText = autoEditText(finalText, false);
     }
 
     function setRecordingState(isRecording, focusEditor = false) {
@@ -329,8 +343,8 @@
 
     function renderTranscript() {
       transcriptEl.value = interimText
-        ? autoEditText(`${finalText} ${interimText}`)
-        : autoEditText(finalText);
+        ? autoEditText(`${finalText} ${interimText}`, false)
+        : autoEditText(finalText, false);
     }
 
     async function postText(path, text = "") {
@@ -421,7 +435,7 @@
       if (!recognition) recognition = createRecognition();
       if (!recognition) return;
 
-      finalText = autoEditText(transcriptEl.value);
+      finalText = autoEditText(transcriptEl.value, false);
       interimText = "";
       renderTranscript();
       shouldRun = true;
