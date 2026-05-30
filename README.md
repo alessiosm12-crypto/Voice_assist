@@ -16,7 +16,7 @@ Voice assist opens a small dictation window with `Ctrl+Alt+D`.
 4. Click `Done`.
 5. Paste the copied text anywhere with `Ctrl+V`.
 
-Inside the dictation window, `Space` or `Ctrl+Shift+M` toggles recognition. The `Start dictation` button is still available as a fallback if the browser blocks automatic start.
+Inside the dictation window, `Space` or `Ctrl+Shift+M` toggles recognition. `Enter` runs `Done`. The `Start dictation` button is still available as a fallback if the browser blocks automatic start.
 
 ## Notes
 

@@ -277,10 +277,7 @@
       shouldRun ? stopRecognition() : startRecognition();
     }
 
-    startBtn.addEventListener("click", startRecognition);
-    stopBtn.addEventListener("click", stopRecognition);
-
-    doneBtn.addEventListener("click", async () => {
+    async function finishDictation() {
       const text = fullTranscript();
       if (!text) {
         setStatus("Пока нечего копировать.", "error");
@@ -298,13 +295,22 @@
         doneBtn.disabled = false;
         setStatus(`Не удалось скопировать текст: ${error.message}`, "error");
       }
-    });
+    }
+
+    startBtn.addEventListener("click", startRecognition);
+    stopBtn.addEventListener("click", stopRecognition);
+    doneBtn.addEventListener("click", finishDictation);
 
     window.addEventListener("keydown", (event) => {
       if (event.isComposing) return;
       if (event.code === "Space" && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey) {
         event.preventDefault();
         toggleRecognition();
+        return;
+      }
+      if (event.code === "Enter" && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey) {
+        event.preventDefault();
+        finishDictation();
         return;
       }
       if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.code === "KeyM") {
