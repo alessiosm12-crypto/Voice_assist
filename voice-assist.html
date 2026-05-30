@@ -267,6 +267,10 @@
       return value.replace(/(^|[.!?]\s+)([а-яёa-z])/giu, (_, prefix, letter) => `${prefix}${letter.toUpperCase()}`);
     }
 
+    function addSentenceBreaksBeforeCapitals(value) {
+      return value.replace(/([а-яёa-z0-9])\s+([А-ЯЁA-Z])/gu, "$1. $2");
+    }
+
     function addRussianCommas(value) {
       return value
         .replace(/([^\s,.;:!?])\s+(но|однако|зато|поэтому|например|кстати|во-первых|во-вторых|впрочем)\b/giu, "$1, $2")
@@ -281,6 +285,7 @@
         .replace(/\s+([,.;:!?])/g, "$1")
         .replace(/([,.;:!?])(?=\S)/g, "$1 ")
         .replace(/([.!?])\s+([,.;:!?])/g, "$1 ");
+      text = addSentenceBreaksBeforeCapitals(text);
       text = addRussianCommas(text);
       text = capitalizeSentences(text);
       if (!/[.!?]$/.test(text)) {
