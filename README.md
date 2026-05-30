@@ -16,7 +16,7 @@ Voice assist opens a small dictation window with `Ctrl+Alt+D`.
 4. Click `Done`.
 5. Paste the copied text anywhere with `Ctrl+V`.
 
-Inside the dictation window, `Space` or `Ctrl+Shift+M` toggles recognition. When paused, the transcript field becomes editable. `Enter` runs `Done` when the transcript field is not focused. The `Start dictation` button is still available as a fallback if the browser blocks automatic start.
+Inside the dictation window, `Space` or `Ctrl+Shift+M` toggles recognition. When paused, the transcript field becomes editable. `Enter` or numpad `Enter` runs `Done` when the transcript field is not focused. The `Start dictation` button is still available as a fallback if the browser blocks automatic start.
 
 Voice assist automatically formats Russian text: it normalizes spacing, adds sentence punctuation, capitalizes sentence starts, and adds basic commas before common connector words. Short recognized fragments are joined softly with commas or spaces instead of being split into many tiny sentences. It does not replace dictated words.
 

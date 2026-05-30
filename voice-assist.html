@@ -487,7 +487,7 @@
         toggleRecognition();
         return;
       }
-      if (event.code === "Enter" && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey) {
+      if ((event.code === "Enter" || event.code === "NumpadEnter") && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey) {
         event.preventDefault();
         finishDictation();
         return;
