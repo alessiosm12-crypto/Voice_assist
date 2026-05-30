@@ -273,6 +273,10 @@
       if (recognition) recognition.stop();
     }
 
+    function toggleRecognition() {
+      shouldRun ? stopRecognition() : startRecognition();
+    }
+
     startBtn.addEventListener("click", startRecognition);
     stopBtn.addEventListener("click", stopRecognition);
 
@@ -298,9 +302,14 @@
 
     window.addEventListener("keydown", (event) => {
       if (event.isComposing) return;
+      if (event.code === "Space" && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey) {
+        event.preventDefault();
+        toggleRecognition();
+        return;
+      }
       if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.code === "KeyM") {
         event.preventDefault();
-        shouldRun ? stopRecognition() : startRecognition();
+        toggleRecognition();
       }
     });
 
