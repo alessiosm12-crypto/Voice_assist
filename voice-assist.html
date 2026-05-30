@@ -263,6 +263,45 @@
       return value.replace(/\s+/g, " ").trim();
     }
 
+    function capitalizeSentences(value) {
+      return value.replace(/(^|[.!?]\s+)([а-яёa-z])/giu, (_, prefix, letter) => `${prefix}${letter.toUpperCase()}`);
+    }
+
+    function addRussianCommas(value) {
+      return value
+        .replace(/([^\s,.;:!?])\s+(но|однако|зато|поэтому|например|кстати|во-первых|во-вторых|впрочем)\b/giu, "$1, $2")
+        .replace(/([^\s,.;:!?])\s+(то есть)\b/giu, "$1, $2");
+    }
+
+    function autoEditText(value) {
+      let text = normalize(value);
+      if (!text) return "";
+
+      text = text
+        .replace(/\s+([,.;:!?])/g, "$1")
+        .replace(/([,.;:!?])(?=\S)/g, "$1 ")
+        .replace(/([.!?])\s+([,.;:!?])/g, "$1 ");
+      text = addRussianCommas(text);
+      text = capitalizeSentences(text);
+      if (!/[.!?]$/.test(text)) {
+        text += ".";
+      }
+      return text;
+    }
+
+    function appendFinalPhrase(phrase) {
+      const cleanPhrase = normalize(phrase);
+      if (!cleanPhrase) return;
+      if (!finalText) {
+        finalText = cleanPhrase;
+      } else if (/[.!?]$/.test(finalText)) {
+        finalText = `${finalText} ${cleanPhrase}`;
+      } else {
+        finalText = `${finalText}. ${cleanPhrase}`;
+      }
+      finalText = autoEditText(finalText);
+    }
+
     function setRecordingState(isRecording, focusEditor = false) {
       document.body.classList.toggle("recording", isRecording);
       stateTextEl.textContent = isRecording ? "Слушаю" : "Пауза";
@@ -280,11 +319,13 @@
     }
 
     function fullTranscript() {
-      return normalize(transcriptEl.value || `${finalText} ${interimText}`);
+      return autoEditText(transcriptEl.value || `${finalText} ${interimText}`);
     }
 
     function renderTranscript() {
-      transcriptEl.value = normalize(`${finalText} ${interimText}`);
+      transcriptEl.value = interimText
+        ? autoEditText(`${finalText} ${interimText}`)
+        : autoEditText(finalText);
     }
 
     async function postText(path, text = "") {
@@ -327,7 +368,7 @@
           const part = normalize(event.results[i][0].transcript);
           if (!part) continue;
           if (event.results[i].isFinal) {
-            finalText = normalize(`${finalText} ${part}`);
+            appendFinalPhrase(part);
           } else {
             interimText = part;
           }
@@ -375,7 +416,7 @@
       if (!recognition) recognition = createRecognition();
       if (!recognition) return;
 
-      finalText = normalize(transcriptEl.value);
+      finalText = autoEditText(transcriptEl.value);
       interimText = "";
       renderTranscript();
       shouldRun = true;
