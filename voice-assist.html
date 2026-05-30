@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="voice-assist-mode" content="clipboard-only">
+  <title>Voice assist</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f7f7f4;
+      --text: #1e232b;
+      --muted: #626b78;
+      --line: #d8dce3;
+      --accent: #1668dc;
+      --accent-strong: #0d4fb3;
+      --danger: #b42318;
+      --ok: #1a7f37;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1c2027;
+        --text: #f3f5f8;
+        --muted: #aab2bf;
+        --line: #3b414c;
+        --accent: #78aefd;
+        --accent-strong: #9bc3ff;
+        --ok: #5cc26f;
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      display: grid;
+      min-height: 100vh;
+      margin: 0;
+      place-items: center;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", system-ui, sans-serif;
+    }
+
+    main {
+      width: min(620px, calc(100vw - 28px));
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: 24px;
+      font-weight: 650;
+      letter-spacing: 0;
+    }
+
+    p {
+      margin: 0 0 16px;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.45;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    button {
+      min-height: 42px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: transparent;
+      color: var(--text);
+      cursor: pointer;
+      font: 650 15px/1 "Segoe UI", system-ui, sans-serif;
+      padding: 0 14px;
+    }
+
+    button.primary {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: white;
+    }
+
+    button.primary:hover {
+      background: var(--accent-strong);
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: .55;
+    }
+
+    #status {
+      min-height: 44px;
+    }
+
+    #status.error {
+      color: var(--danger);
+    }
+
+    #status.ok {
+      color: var(--ok);
+    }
+
+    #transcript {
+      min-height: 120px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      overflow-wrap: anywhere;
+      color: var(--text);
+      font-size: 18px;
+      line-height: 1.35;
+      white-space: pre-wrap;
+    }
+
+    .interim {
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Voice assist</h1>
+    <p id="status">Нажмите «Начать диктовку». Когда закончите, нажмите «Готово», и текст скопируется в буфер обмена.</p>
+    <div class="toolbar">
+      <button id="start" class="primary" type="button" aria-label="Начать голосовой ввод">Начать диктовку</button>
+      <button id="stop" type="button" aria-label="Остановить голосовой ввод" disabled>Остановить</button>
+      <button id="done" type="button" aria-label="Скопировать текст и закрыть окно">Готово</button>
+    </div>
+    <div id="transcript" aria-live="polite"></div>
+  </main>
+
+  <script>
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const statusEl = document.querySelector("#status");
+    const transcriptEl = document.querySelector("#transcript");
+    const startBtn = document.querySelector("#start");
+    const stopBtn = document.querySelector("#stop");
+    const doneBtn = document.querySelector("#done");
+
+    let recognition = null;
+    let shouldRun = false;
+    let finalText = "";
+    let interimText = "";
+
+    function normalize(value) {
+      return value.replace(/\s+/g, " ").trim();
+    }
+
+    function setStatus(message, mode = "") {
+      statusEl.textContent = message;
+      statusEl.classList.toggle("error", mode === "error");
+      statusEl.classList.toggle("ok", mode === "ok");
+    }
+
+    function fullTranscript() {
+      return normalize(`${finalText} ${interimText}`);
+    }
+
+    function renderTranscript() {
+      transcriptEl.textContent = "";
+      if (finalText) {
+        transcriptEl.append(document.createTextNode(finalText));
+      }
+      if (interimText) {
+        const span = document.createElement("span");
+        span.className = "interim";
+        span.textContent = `${finalText ? " " : ""}${interimText}`;
+        transcriptEl.append(span);
+      }
+    }
+
+    async function postText(path, text = "") {
+      const response = await fetch(path, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain; charset=utf-8" },
+        body: text
+      });
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+    }
+
+    function createRecognition() {
+      if (!SpeechRecognition) {
+        setStatus("В этом браузере нет Web Speech API. Откройте окно в Chrome или Edge.", "error");
+        startBtn.disabled = true;
+        stopBtn.disabled = true;
+        return null;
+      }
+
+      const instance = new SpeechRecognition();
+      instance.lang = "ru-RU";
+      instance.continuous = true;
+      instance.interimResults = true;
+      instance.maxAlternatives = 1;
+
+      instance.onstart = () => {
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+        setStatus("Слушаю. Говорите по-русски, затем нажмите «Готово».", "ok");
+      };
+
+      instance.onresult = (event) => {
+        interimText = "";
+        for (let i = event.resultIndex; i < event.results.length; i += 1) {
+          const part = normalize(event.results[i][0].transcript);
+          if (!part) continue;
+          if (event.results[i].isFinal) {
+            finalText = normalize(`${finalText} ${part}`);
+          } else {
+            interimText = part;
+          }
+        }
+        renderTranscript();
+      };
+
+      instance.onerror = (event) => {
+        let message = `Ошибка распознавания: ${event.error}`;
+        if (event.error === "not-allowed") {
+          message = "Разрешите микрофон для этой страницы, затем запустите диктовку снова.";
+        } else if (event.error === "audio-capture") {
+          message = "Браузер не получил звук с микрофона. Проверьте микрофон и разрешения Windows.";
+        } else if (event.error === "network") {
+          message = "Распознавание требует интернет-соединение. Проверьте сеть и попробуйте снова.";
+        } else if (event.error === "no-speech") {
+          message = "Речь не обнаружена. Можно продолжить диктовку.";
+        }
+        setStatus(message, event.error === "no-speech" ? "" : "error");
+      };
+
+      instance.onend = () => {
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+        if (shouldRun) {
+          window.setTimeout(() => {
+            try {
+              instance.start();
+            } catch {
+              shouldRun = false;
+              setStatus("Диктовка остановлена браузером. Нажмите «Начать диктовку», чтобы продолжить.", "error");
+            }
+          }, 200);
+        } else {
+          setStatus("Диктовка остановлена.", "ok");
+        }
+      };
+
+      return instance;
+    }
+
+    function startRecognition() {
+      if (!recognition) recognition = createRecognition();
+      if (!recognition) return;
+
+      shouldRun = true;
+      try {
+        recognition.start();
+      } catch {
+        setStatus("Диктовка уже запускается.", "error");
+      }
+    }
+
+    function stopRecognition() {
+      shouldRun = false;
+      if (recognition) recognition.stop();
+    }
+
+    startBtn.addEventListener("click", startRecognition);
+    stopBtn.addEventListener("click", stopRecognition);
+
+    doneBtn.addEventListener("click", async () => {
+      const text = fullTranscript();
+      if (!text) {
+        setStatus("Пока нечего копировать.", "error");
+        return;
+      }
+
+      stopRecognition();
+      doneBtn.disabled = true;
+      setStatus("Копирую текст в буфер обмена...", "ok");
+      try {
+        await postText("/copy", text);
+        setStatus("Скопировано. Теперь можно вставить текст в любое окно через Ctrl+V.", "ok");
+        window.setTimeout(() => window.close(), 350);
+      } catch (error) {
+        doneBtn.disabled = false;
+        setStatus(`Не удалось скопировать текст: ${error.message}`, "error");
+      }
+    });
+
+    window.addEventListener("keydown", (event) => {
+      if (event.isComposing) return;
+      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.code === "KeyM") {
+        event.preventDefault();
+        shouldRun ? stopRecognition() : startRecognition();
+      }
+    });
+
+    if (!SpeechRecognition) {
+      setStatus("В этом браузере нет Web Speech API. Откройте окно в Chrome или Edge.", "error");
+      startBtn.disabled = true;
+      stopBtn.disabled = true;
+    }
+  </script>
+</body>
+</html>
