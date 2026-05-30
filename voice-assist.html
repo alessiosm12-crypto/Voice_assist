@@ -152,25 +152,28 @@
     }
 
     #transcript {
+      display: block;
+      width: 100%;
       min-height: 150px;
       border: 1px solid var(--line);
       border-radius: 12px;
       background: #0d1118;
       color: var(--text);
+      font: 19px/1.45 "Segoe UI", system-ui, sans-serif;
       font-size: 19px;
       line-height: 1.45;
       overflow-wrap: anywhere;
       padding: 16px;
+      resize: vertical;
       white-space: pre-wrap;
     }
 
-    #transcript:empty::before {
-      content: "Текст появится здесь...";
-      color: #667085;
+    #transcript:read-only {
+      cursor: default;
     }
 
-    .interim {
-      color: var(--muted);
+    #transcript::placeholder {
+      color: #667085;
     }
 
     .hint {
@@ -234,7 +237,7 @@
       <button id="done" type="button" aria-label="Скопировать текст и закрыть окно">Готово</button>
     </div>
 
-    <div id="transcript" aria-live="polite"></div>
+    <textarea id="transcript" aria-live="polite" placeholder="Текст появится здесь..." readonly></textarea>
 
     <div class="hint" aria-label="Горячие клавиши">
       <span><kbd>Space</kbd> пауза/старт</span>
@@ -260,9 +263,14 @@
       return value.replace(/\s+/g, " ").trim();
     }
 
-    function setRecordingState(isRecording) {
+    function setRecordingState(isRecording, focusEditor = false) {
       document.body.classList.toggle("recording", isRecording);
       stateTextEl.textContent = isRecording ? "Слушаю" : "Пауза";
+      transcriptEl.readOnly = isRecording;
+      if (!isRecording && focusEditor) {
+        transcriptEl.focus();
+        transcriptEl.setSelectionRange(transcriptEl.value.length, transcriptEl.value.length);
+      }
     }
 
     function setStatus(message, mode = "") {
@@ -272,20 +280,11 @@
     }
 
     function fullTranscript() {
-      return normalize(`${finalText} ${interimText}`);
+      return normalize(transcriptEl.value || `${finalText} ${interimText}`);
     }
 
     function renderTranscript() {
-      transcriptEl.textContent = "";
-      if (finalText) {
-        transcriptEl.append(document.createTextNode(finalText));
-      }
-      if (interimText) {
-        const span = document.createElement("span");
-        span.className = "interim";
-        span.textContent = `${finalText ? " " : ""}${interimText}`;
-        transcriptEl.append(span);
-      }
+      transcriptEl.value = normalize(`${finalText} ${interimText}`);
     }
 
     async function postText(path, text = "") {
@@ -353,8 +352,8 @@
       instance.onend = () => {
         startBtn.disabled = false;
         stopBtn.disabled = true;
-        setRecordingState(false);
         if (shouldRun) {
+          setRecordingState(false);
           window.setTimeout(() => {
             try {
               instance.start();
@@ -364,6 +363,7 @@
             }
           }, 200);
         } else {
+          setRecordingState(false, true);
           setStatus("Диктовка остановлена.", "ok");
         }
       };
@@ -375,6 +375,9 @@
       if (!recognition) recognition = createRecognition();
       if (!recognition) return;
 
+      finalText = normalize(transcriptEl.value);
+      interimText = "";
+      renderTranscript();
       shouldRun = true;
       try {
         recognition.start();
@@ -418,6 +421,7 @@
 
     window.addEventListener("keydown", (event) => {
       if (event.isComposing) return;
+      if (event.target === transcriptEl && !transcriptEl.readOnly) return;
       if (event.code === "Space" && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey) {
         event.preventDefault();
         toggleRecognition();
