@@ -292,6 +292,7 @@
     let recognition = null;
     let shouldRun = false;
     let isReviewing = false;
+    let lastRecognitionError = "";
     let finalText = "";
     let interimText = "";
     let dictionaryTerms = loadDictionary();
@@ -631,6 +632,10 @@
       statusEl.classList.toggle("ok", mode === "ok");
     }
 
+    function isTerminalRecognitionError(error) {
+      return ["not-allowed", "service-not-allowed", "audio-capture", "network", "language-not-supported"].includes(error);
+    }
+
     function fullTranscript() {
       return autoEditText(transcriptEl.value || `${finalText} ${interimText}`);
     }
@@ -669,6 +674,7 @@
       instance.maxAlternatives = 1;
 
       instance.onstart = () => {
+        lastRecognitionError = "";
         startBtn.disabled = true;
         stopBtn.disabled = false;
         setRecordingState(true);
@@ -690,6 +696,7 @@
       };
 
       instance.onerror = (event) => {
+        lastRecognitionError = event.error;
         let message = `Ошибка распознавания: ${event.error}`;
         if (event.error === "not-allowed") {
           message = "Разрешите микрофон для этой страницы, затем запустите диктовку снова.";
@@ -700,6 +707,9 @@
         } else if (event.error === "no-speech") {
           message = "Речь не обнаружена. Можно продолжить диктовку.";
         }
+        if (isTerminalRecognitionError(event.error)) {
+          shouldRun = false;
+        }
         setStatus(message, event.error === "no-speech" ? "" : "error");
       };
 
@@ -708,6 +718,11 @@
         stopBtn.disabled = true;
         if (isReviewing) {
           startBtn.disabled = true;
+          return;
+        }
+        if (lastRecognitionError && isTerminalRecognitionError(lastRecognitionError)) {
+          setRecordingState(false);
+          stateTextEl.textContent = "Ошибка";
           return;
         }
         if (shouldRun) {
@@ -738,6 +753,7 @@
       interimText = "";
       renderTranscript();
       shouldRun = true;
+      lastRecognitionError = "";
       try {
         recognition.start();
       } catch {

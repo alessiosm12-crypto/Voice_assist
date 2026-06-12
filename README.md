@@ -30,3 +30,4 @@ Voice assist also has a local user dictionary for names, companies, and domain t
 - Voice recognition uses the browser Web Speech API.
 - Use Google Chrome or Microsoft Edge.
 - The final text is copied to the clipboard; automatic insertion into other apps is intentionally disabled.
+- If the browser reports that it did not receive microphone audio, check Windows and browser microphone permissions, then press `Start` again.
