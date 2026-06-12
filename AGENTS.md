@@ -1,148 +1,148 @@
 # AGENTS.md
 
-## Project Overview
+## Обзор проекта
 
-Voice assist is a small local Windows utility for Russian voice dictation. It opens a compact browser window, starts speech recognition automatically, shows the transcript in near real time, formats the recognized Russian text, copies the final result to the clipboard, and lets the user paste it into Codex or any other application manually.
+Voice assist - небольшая локальная Windows-утилита для голосовой диктовки на русском языке. Она открывает компактное окно браузера, автоматически запускает распознавание речи, показывает расшифровку почти в реальном времени, форматирует распознанный русский текст, копирует итоговый результат в буфер обмена и позволяет пользователю вручную вставить его в Codex или любое другое приложение.
 
-The project intentionally uses a clipboard-first flow. It does not try to inject text directly into other applications, because earlier attempts were unreliable across windows and focus states.
+Проект намеренно использует сценарий "сначала буфер обмена". Он не пытается вставлять текст напрямую в другие приложения, потому что предыдущие попытки были ненадежны из-за различий между окнами и состояниями фокуса.
 
-## Technologies And Architecture
+## Технологии и архитектура
 
-- Frontend: one standalone `voice-assist.html` file with HTML, CSS, and browser JavaScript.
-- Speech recognition: browser Web Speech API through `SpeechRecognition` / `webkitSpeechRecognition`.
-- Runtime shell: PowerShell scripts and small `.cmd` launchers for Windows.
-- Local backend: `serve-voice-assist.ps1` runs a minimal `HttpListener` server on port `57832`.
-- Clipboard integration: PowerShell uses `System.Windows.Forms.Clipboard` from an STA process.
-- Hotkey listener: `Voice assist hotkey.ps1` registers a native Windows `Ctrl+Alt+D` hotkey through a small embedded C# `NativeWindow`.
-- Browser launch: `start-voice-assist.ps1` starts Chrome in app mode when available, otherwise falls back to Edge or the default browser.
+- Фронтенд: один самостоятельный файл `voice-assist.html` с HTML, CSS и браузерным JavaScript.
+- Распознавание речи: браузерный Web Speech API через `SpeechRecognition` / `webkitSpeechRecognition`.
+- Среда запуска: PowerShell-скрипты и небольшие `.cmd`-лаунчеры для Windows.
+- Локальный бэкенд: `serve-voice-assist.ps1` запускает минимальный сервер `HttpListener` на порту `57832`.
+- Интеграция с буфером обмена: PowerShell использует `System.Windows.Forms.Clipboard` из STA-процесса.
+- Слушатель горячей клавиши: `Voice assist hotkey.ps1` регистрирует нативную Windows-клавишу `Ctrl+Alt+D` через небольшой встроенный C# `NativeWindow`.
+- Запуск браузера: `start-voice-assist.ps1` открывает Chrome в режиме приложения, если он доступен, иначе использует Edge или браузер по умолчанию.
 
-Architectural principles:
+Архитектурные принципы:
 
-- Keep the project dependency-free and easy to run on Windows.
-- Keep user-facing behavior local: no external services, no cloud API calls, no server beyond localhost.
-- Prefer a small number of explicit scripts over build tooling.
-- Keep dictation, formatting, and UI logic in the HTML file unless a real complexity threshold justifies extraction.
-- Prefer clipboard copy over automatic insertion into arbitrary applications.
+- Держать проект без внешних зависимостей и простым для запуска в Windows.
+- Сохранять пользовательское поведение локальным: без внешних сервисов, облачных API и серверов вне localhost.
+- Предпочитать небольшое количество явных скриптов вместо build tooling.
+- Держать логику диктовки, форматирования и интерфейса в HTML-файле, пока сложность проекта не потребует выделения модулей.
+- Предпочитать копирование в буфер обмена автоматической вставке в произвольные приложения.
 
-## Project Structure
+## Структура проекта
 
-- `voice-assist.html`: main user interface, dark theme, Web Speech API integration, hotkeys inside the dictation window, transcript editing, Russian text formatting, and `/copy` request on Done.
-- `serve-voice-assist.ps1`: local HTTP server that serves `voice-assist.html` and handles `POST /copy` by writing text to the Windows clipboard.
-- `start-voice-assist.ps1`: restarts the local server, waits briefly, and opens the dictation window in the browser.
-- `Voice assist.cmd`: user-facing launcher for `start-voice-assist.ps1`.
-- `Voice assist hotkey.ps1`: long-running global hotkey listener for `Ctrl+Alt+D`.
-- `Voice assist hotkey.cmd`: launcher for the hotkey listener.
-- `install-voice-assist.ps1`: creates or refreshes the desktop shortcut and Startup shortcut, then restarts the hotkey listener.
-- `README.md`: user documentation for installation, usage, and behavior notes.
-- `AGENTS.md`: living project knowledge base and development instructions for future agents.
+- `voice-assist.html`: основной пользовательский интерфейс, темная тема, интеграция с Web Speech API, горячие клавиши внутри окна диктовки, редактирование расшифровки, форматирование русского текста и запрос `/copy` при действии "Готово".
+- `serve-voice-assist.ps1`: локальный HTTP-сервер, который отдает `voice-assist.html` и обрабатывает `POST /copy`, записывая текст в буфер обмена Windows.
+- `start-voice-assist.ps1`: перезапускает локальный сервер, коротко ожидает и открывает окно диктовки в браузере.
+- `Voice assist.cmd`: пользовательский лаунчер для `start-voice-assist.ps1`.
+- `Voice assist hotkey.ps1`: долгоживущий глобальный слушатель горячей клавиши `Ctrl+Alt+D`.
+- `Voice assist hotkey.cmd`: лаунчер для слушателя горячей клавиши.
+- `install-voice-assist.ps1`: создает или обновляет ярлык на рабочем столе и ярлык в автозагрузке, затем перезапускает слушатель горячей клавиши.
+- `README.md`: пользовательская документация по установке, использованию и особенностям поведения.
+- `AGENTS.md`: живая база знаний проекта и инструкции по разработке для будущих агентов.
 
-There are no source subdirectories at the moment. Keep the flat structure unless the project grows enough to make grouping useful.
+Сейчас в проекте нет исходных подкаталогов. Сохраняйте плоскую структуру, пока проект не вырастет настолько, что группировка файлов станет действительно полезной.
 
-## Existing Documentation And Decision Files
+## Существующая документация и файлы решений
 
-- `README.md`: public/user-facing documentation. It explains installation, launch flow, controls, browser requirements, Russian auto-formatting, and clipboard behavior.
-- `AGENTS.md`: internal development guide and evolving knowledge base.
+- `README.md`: публичная пользовательская документация. Описывает установку, сценарий запуска, элементы управления, требования к браузеру, автоформатирование русского текста и поведение буфера обмена.
+- `AGENTS.md`: внутреннее руководство по разработке и развивающаяся база знаний.
 
-No ADR files, architecture notes, changelog, or separate decision logs currently exist.
+ADR-файлов, архитектурных заметок, changelog или отдельных журналов решений сейчас нет.
 
-When functionality changes, update the related documentation in the same task:
+При изменении функциональности обновляйте связанную документацию в той же задаче:
 
-- Update `README.md` for user-visible behavior, installation, controls, requirements, or limitations.
-- Update `AGENTS.md` when architecture, project rules, testing approach, user preferences, or project learnings change.
-- Add a dedicated decision note or ADR only if a future architectural decision becomes too large to preserve clearly in `AGENTS.md`.
+- Обновляйте `README.md`, если меняется пользовательское поведение, установка, элементы управления, требования или ограничения.
+- Обновляйте `AGENTS.md`, если меняется архитектура, проектные правила, подход к тестированию, предпочтения пользователя или накопленные знания о проекте.
+- Добавляйте отдельную заметку с решением или ADR только если будущее архитектурное решение станет слишком большим, чтобы ясно хранить его в `AGENTS.md`.
 
-## Development And Coding Rules
+## Правила разработки и кодирования
 
-- Preserve UTF-8 text in HTML and Markdown files. The UI contains Russian text; inspect files with UTF-8-aware commands when needed.
-- Keep PowerShell scripts compatible with Windows PowerShell. Avoid assuming PowerShell 7-only features.
-- Clipboard work must happen from an STA-capable process.
-- Keep the local server bound to localhost / `127.0.0.1`; do not expose it externally.
-- Keep port `57832` unless there is a strong reason to change it, and update all launch/documentation references if it changes.
-- Avoid adding package managers, bundlers, frameworks, or npm dependencies unless the project clearly outgrows the current simple shape.
-- Do not reintroduce automatic text insertion into Codex or other apps. The accepted product behavior is copy-to-clipboard followed by manual paste.
-- Do not replace dictated words during auto-formatting. Formatting may normalize spaces, punctuation, capitalization, sentence boundaries, and commas only.
-- Keep window-level keyboard shortcuts from interfering with manual editing: when the transcript field is focused and editable, normal text editing should win.
-- Preserve both regular `Enter` and numpad `Enter` support for Done when focus is not inside the editable transcript.
-- Keep `Space` as the pause/start toggle inside the dictation window, while allowing literal spaces during manual transcript editing.
-- If scripts are renamed or moved, update launchers, shortcuts, installer logic, README, and this file together.
+- Сохраняйте UTF-8 в HTML и Markdown-файлах. Интерфейс содержит русский текст; при необходимости просматривайте файлы командами с учетом UTF-8.
+- Сохраняйте совместимость PowerShell-скриптов с Windows PowerShell. Не полагайтесь на возможности, доступные только в PowerShell 7.
+- Работа с буфером обмена должна выполняться из STA-совместимого процесса.
+- Держите локальный сервер привязанным к localhost / `127.0.0.1`; не открывайте его наружу.
+- Сохраняйте порт `57832`, если нет веской причины менять его; при изменении порта обновляйте все ссылки в лаунчерах и документации.
+- Не добавляйте package manager, bundler, framework или npm-зависимости, пока проект явно не перерастет текущую простую форму.
+- Не возвращайте автоматическую вставку текста в Codex или другие приложения. Принятое поведение продукта - копирование в буфер обмена с последующей ручной вставкой.
+- Не заменяйте продиктованные слова во время автоформатирования. Форматирование может нормализовать только пробелы, пунктуацию, заглавные буквы, границы предложений и запятые.
+- Следите, чтобы горячие клавиши окна не мешали ручному редактированию: когда поле расшифровки в фокусе и доступно для редактирования, обычное редактирование текста должно иметь приоритет.
+- Сохраняйте поддержку и обычного `Enter`, и `NumpadEnter` для действия "Готово", когда фокус не находится внутри редактируемой расшифровки.
+- Сохраняйте `Space` как переключатель пауза/старт внутри окна диктовки, но позволяйте вводить обычные пробелы при ручном редактировании расшифровки.
+- Если скрипты переименованы или перемещены, вместе с этим обновляйте лаунчеры, ярлыки, логику установки, README и этот файл.
 
-## New Feature Design Rules
+## Правила проектирования новых функций
 
-- Start from the user's actual workflow: open with hotkey, dictate immediately, pause/edit when needed, press Done, paste manually.
-- Favor direct controls and predictable keyboard behavior over hidden state.
-- For UI changes, keep the dark compact tool design. Avoid landing pages, decorative sections, or large explanatory text inside the app.
-- New features should not require network access beyond browser speech recognition support.
-- Any text-processing feature must be conservative: prefer fewer changes over surprising rewrites.
-- Russian punctuation formatting is heuristic. Treat it as assistive cleanup, not as a full grammar engine.
-- If adding more language intelligence, keep a clear switch or boundary so the app does not silently change user wording.
-- If adding more endpoints to the local server, keep them narrow, local-only, and documented.
+- Отталкивайтесь от фактического пользовательского сценария: открыть горячей клавишей, сразу диктовать, при необходимости поставить на паузу и отредактировать, нажать "Готово", вставить вручную.
+- Предпочитайте прямые элементы управления и предсказуемое поведение клавиатуры скрытым состояниям.
+- Для изменений интерфейса сохраняйте темный компактный дизайн инструмента. Избегайте landing page, декоративных секций и больших объяснительных текстов внутри приложения.
+- Новые функции не должны требовать сетевого доступа, кроме поддержки браузерного распознавания речи.
+- Любая функция обработки текста должна быть консервативной: лучше меньше изменений, чем неожиданные переписывания текста.
+- Форматирование русской пунктуации является эвристическим. Рассматривайте его как вспомогательную очистку, а не как полноценный грамматический движок.
+- Если добавляется более умная языковая обработка, сохраняйте четкую границу или переключатель, чтобы приложение не меняло слова пользователя незаметно.
+- Если добавляются новые endpoint'ы локального сервера, держите их узкими по назначению, локальными и задокументированными.
 
-## Testing Requirements
+## Требования к тестированию
 
-There is no automated test suite currently.
+Автоматизированного набора тестов сейчас нет.
 
-For every meaningful change, perform at least these checks:
+Для каждого значимого изменения выполняйте как минимум эти проверки:
 
-- Run `git diff --check`.
-- Verify the local page responds: `Invoke-WebRequest -UseBasicParsing http://127.0.0.1:57832/`.
-- If the server is not running, start the app through `Voice assist.cmd` or `start-voice-assist.ps1` and repeat the check.
-- For UI or keyboard changes, manually verify in Chrome or Edge:
-  - `Ctrl+Alt+D` opens the window through the hotkey listener.
-  - Dictation starts automatically when the window opens.
-  - `Space` toggles pause/start outside transcript editing.
-  - Manual editing works while paused.
-  - Regular `Enter` and numpad `Enter` run Done when the transcript field is not focused.
-  - Done copies formatted text to the clipboard and closes the window.
-- For Russian formatting changes, test representative phrases for:
-  - sentence capitalization;
-  - soft sentence splitting;
-  - commas before adversative conjunctions;
-  - introductory words;
-  - compound subordinating conjunctions such as `потому что` and `перед тем как`;
-  - no replacement of dictated words.
+- Запустите `git diff --check`.
+- Убедитесь, что локальная страница отвечает: `Invoke-WebRequest -UseBasicParsing http://127.0.0.1:57832/`.
+- Если сервер не запущен, запустите приложение через `Voice assist.cmd` или `start-voice-assist.ps1` и повторите проверку.
+- Для изменений интерфейса или клавиатуры вручную проверьте в Chrome или Edge:
+  - `Ctrl+Alt+D` открывает окно через слушатель горячей клавиши.
+  - Диктовка запускается автоматически при открытии окна.
+  - `Space` переключает паузу/старт вне режима редактирования расшифровки.
+  - Ручное редактирование работает на паузе.
+  - Обычный `Enter` и `NumpadEnter` выполняют "Готово", когда поле расшифровки не в фокусе.
+  - "Готово" копирует отформатированный текст в буфер обмена и закрывает окно.
+- Для изменений русского форматирования проверяйте типовые фразы на:
+  - заглавные буквы в начале предложений;
+  - мягкое разделение предложений;
+  - запятые перед противительными союзами;
+  - вводные слова;
+  - составные подчинительные союзы вроде `потому что` и `перед тем как`;
+  - отсутствие замены продиктованных слов.
 
-If a check cannot be run, say so explicitly in the final response and explain the remaining risk.
+Если какую-то проверку невозможно выполнить, явно укажите это в финальном ответе и объясните оставшийся риск.
 
-## Documentation Requirements
+## Требования к документации
 
-- Keep `README.md` concise and user-facing.
-- Keep `AGENTS.md` practical and project-specific; do not let it become generic boilerplate.
-- Update documentation in the same change as code when behavior changes.
-- Mention user-visible keyboard shortcuts, browser requirements, clipboard behavior, and limitations.
-- When adding scripts, endpoints, launch modes, or installation steps, document their purpose.
-- When changing Russian formatting rules, document the level of support as heuristic rather than perfect grammar parsing.
+- Держите `README.md` кратким и ориентированным на пользователя.
+- Держите `AGENTS.md` практичным и специфичным для проекта; не превращайте его в общий шаблон.
+- Обновляйте документацию в том же изменении, что и код, если меняется поведение.
+- Указывайте видимые пользователю горячие клавиши, требования к браузеру, поведение буфера обмена и ограничения.
+- При добавлении скриптов, endpoint'ов, режимов запуска или шагов установки документируйте их назначение.
+- При изменении правил русского форматирования описывайте уровень поддержки как эвристический, а не как идеальный грамматический разбор.
 
-## User Preferences
+## Предпочтения пользователя
 
-- The user prefers practical implementation over long planning and expects Codex to make the change, test it, and push when appropriate.
-- The user iterates through hands-on feedback: "doesn't insert", "works", "remove this", "rename this", "make it darker", and similar direct adjustments.
-- The accepted workflow is clipboard-based: after Done, text is copied and the user pastes it manually into any target window.
-- The user values hotkey-driven operation and minimal mouse use.
-- The user prefers Russian-language behavior and Russian text formatting that follows common Russian punctuation norms.
-- The user prefers a modern dark UI without unnecessary hints or clutter.
-- The user wants the project kept clean: English folder/project naming, only necessary files, and GitHub-ready contents.
-- The user wants project knowledge to accumulate in documentation after meaningful tasks.
+- Пользователь предпочитает практическую реализацию долгому планированию и ожидает, что Codex внесет изменение, проверит его и при необходимости отправит в репозиторий.
+- Пользователь работает через прикладную обратную связь: "не вставляет", "работает", "убери это", "переименуй это", "сделай темнее" и похожие прямые корректировки.
+- Принятый сценарий работы основан на буфере обмена: после "Готово" текст копируется, а пользователь вручную вставляет его в целевое окно.
+- Пользователь ценит управление горячими клавишами и минимальное использование мыши.
+- Пользователь предпочитает русскоязычное поведение и форматирование русского текста по распространенным нормам пунктуации.
+- Пользователь предпочитает современный темный интерфейс без лишних подсказок и визуального шума.
+- Пользователь хочет держать проект чистым: английское имя папки/проекта, только необходимые файлы и готовность к GitHub.
+- Пользователь хочет, чтобы знания о проекте накапливались в документации после значимых задач.
 
-## Project Learnings
+## Накопленные знания о проекте
 
-- Direct insertion into the Codex window was unreliable, so the project moved to a robust copy-to-clipboard model.
-- Global `Ctrl+Alt+D` is implemented independently from Windows shortcut hotkeys via `RegisterHotKey`, because desktop shortcut hotkeys were not reliable enough by themselves.
-- The hotkey listener must be installed into Startup and kept running for global launch behavior.
-- Moving the project folder can break shortcuts and hotkey paths; rerun `install-voice-assist.ps1` after moving the folder.
-- Web Speech API support requires Chrome or Edge and may block automatic start in some browser states; the Start button remains as a fallback.
-- Numpad Enter must be handled explicitly with `event.code === "NumpadEnter"` in addition to normal Enter behavior.
-- Manual editing is allowed only while paused; while recording, the transcript is read-only to avoid conflicts with live recognition updates.
-- Russian punctuation uses regex-based heuristics. JavaScript `\b` is unreliable for Cyrillic word boundaries, so punctuation rules should use explicit whitespace/end/punctuation lookaheads instead.
-- Compound conjunctions need protection before applying single-word subordinate rules, otherwise phrases like `потому что` can become incorrectly split as `потому, что`.
-- Node.js is not installed on the user's machine at the time of writing, so avoid requiring Node-based tooling unless explicitly introduced and documented.
+- Прямая вставка в окно Codex оказалась ненадежной, поэтому проект перешел на устойчивую модель копирования в буфер обмена.
+- Глобальная клавиша `Ctrl+Alt+D` реализована независимо от hotkey ярлыка Windows через `RegisterHotKey`, потому что горячие клавиши ярлыков рабочего стола были недостаточно надежны.
+- Слушатель горячей клавиши должен быть установлен в автозагрузку и постоянно работать для глобального запуска.
+- Перемещение папки проекта может сломать пути ярлыков и hotkey listener; после перемещения папки нужно заново запустить `install-voice-assist.ps1`.
+- Для Web Speech API нужен Chrome или Edge. В некоторых состояниях браузер может блокировать автоматический старт; кнопка "Начать" остается fallback-вариантом.
+- `NumpadEnter` нужно обрабатывать явно через `event.code === "NumpadEnter"` дополнительно к обычному поведению Enter.
+- Ручное редактирование разрешено только на паузе; во время записи расшифровка находится в режиме read-only, чтобы не конфликтовать с обновлениями live recognition.
+- Русская пунктуация использует regex-эвристики. JavaScript `\b` ненадежен для границ кириллических слов, поэтому правила пунктуации должны использовать явные lookahead-проверки пробела, конца строки или знака препинания.
+- Составные союзы нужно защищать перед применением правил для одиночных подчинительных слов, иначе фразы вроде `потому что` могут ошибочно превратиться в `потому, что`.
+- На машине пользователя на момент записи не установлен Node.js, поэтому не требуйте Node-based tooling, если он не был явно добавлен и задокументирован.
 
-## Ongoing Task Checklist
+## Чеклист текущей задачи
 
-After each significant task:
+После каждой значимой задачи:
 
-1. Check whether `README.md` needs an update.
-2. Check whether `AGENTS.md` needs an update.
-3. Update `User Preferences` when the user's behavior or preferences become clearer.
-4. Update `Project Learnings` when a technical decision, limitation, or fix becomes reusable knowledge.
-5. Run the relevant checks from `Testing Requirements`.
-6. Briefly summarize changed files, checks performed, and any skipped checks.
+1. Проверьте, нужно ли обновить `README.md`.
+2. Проверьте, нужно ли обновить `AGENTS.md`.
+3. Обновите `Предпочтения пользователя`, если поведение или предпочтения пользователя стали понятнее.
+4. Обновите `Накопленные знания о проекте`, если техническое решение, ограничение или исправление стало переиспользуемым знанием.
+5. Запустите релевантные проверки из раздела `Требования к тестированию`.
+6. Кратко опишите измененные файлы, выполненные проверки и пропущенные проверки.
