@@ -243,7 +243,7 @@
     <div class="header">
       <div>
         <h1>Voice assist</h1>
-        <p>Диктовка запускается автоматически. Нажмите «Готово», чтобы скопировать текст в буфер обмена.</p>
+        <p>Диктовка запускается автоматически. Нажмите «Готово», чтобы проверить текст перед копированием.</p>
       </div>
       <div class="state" aria-live="polite">
         <span class="dot" aria-hidden="true"></span>
@@ -256,7 +256,8 @@
     <div class="toolbar">
       <button id="start" class="primary" type="button" aria-label="Начать голосовой ввод">Начать</button>
       <button id="stop" type="button" aria-label="Остановить голосовой ввод" disabled>Пауза</button>
-      <button id="done" type="button" aria-label="Скопировать текст и закрыть окно">Готово</button>
+      <button id="done" type="button" aria-label="Проверить текст перед копированием">Готово</button>
+      <button id="back" type="button" hidden>Вернуться</button>
     </div>
 
     <textarea id="transcript" aria-live="polite" placeholder="Текст появится здесь..." readonly></textarea>
@@ -269,7 +270,7 @@
 
     <div class="hint" aria-label="Горячие клавиши">
       <span><kbd>Space</kbd> пауза/старт</span>
-      <span><kbd>Enter</kbd> готово</span>
+      <span><kbd>Enter</kbd> <span id="enterHint">готово</span></span>
     </div>
   </main>
 
@@ -281,13 +282,16 @@
     const startBtn = document.querySelector("#start");
     const stopBtn = document.querySelector("#stop");
     const doneBtn = document.querySelector("#done");
+    const backBtn = document.querySelector("#back");
     const addDictionaryBtn = document.querySelector("#addDictionary");
     const clearDictionaryBtn = document.querySelector("#clearDictionary");
     const dictionaryCountEl = document.querySelector("#dictionaryCount");
+    const enterHintEl = document.querySelector("#enterHint");
     const DICTIONARY_STORAGE_KEY = "voiceAssist.dictionary.v1";
 
     let recognition = null;
     let shouldRun = false;
+    let isReviewing = false;
     let finalText = "";
     let interimText = "";
     let dictionaryTerms = loadDictionary();
@@ -524,6 +528,65 @@
         .trim();
     }
 
+    function protectPhrases(value, phrases) {
+      const protectedPhrases = [];
+      const pattern = new RegExp(`(^|\\s)(${phrases.join("|")})(?=$|\\s|[,.;:!?])`, "giu");
+      const text = value.replace(pattern, (_match, prefix, phrase) => {
+        const token = `__protected_${protectedPhrases.length}__`;
+        protectedPhrases.push(phrase);
+        return `${prefix}${token}`;
+      });
+      return {
+        text,
+        restore: (restoredText) => restoredText.replace(/__protected_(\d+)__/g, (_, index) => protectedPhrases[Number(index)])
+      };
+    }
+
+    function finalRussianReview(value) {
+      let text = autoEditText(value);
+      if (!text) return "";
+
+      const compoundConjunctions = [
+        "потому что",
+        "так как",
+        "для того чтобы",
+        "несмотря на то что",
+        "из-за того что",
+        "перед тем как",
+        "после того как",
+        "в то время как",
+        "по мере того как"
+      ];
+      const introductoryWords = "например|кстати|впрочем|значит|итак|наконец|конечно|возможно|вероятно|кажется|пожалуйста|видимо|очевидно|по-моему|во-первых|во-вторых|с одной стороны|с другой стороны";
+      const subordinateWords = "что|чтобы|если|когда|пока|хотя|поскольку|где|куда|откуда|зачем|почему";
+      const relativeWords = "который|которая|которое|которые|которого|которой|которых|которому|которым|которыми|котором";
+      const protectedCompounds = protectPhrases(text, compoundConjunctions);
+
+      text = protectedCompounds.text
+        .replace(/([^\s,.;:!?])\s+(а|но|однако|зато|поэтому)(?=$|\s|[,.;:!?])/giu, "$1, $2")
+        .replace(new RegExp(`([^\\s,.;:!?])\\s+(${introductoryWords})(?=$|\\s|[,.;:!?])`, "giu"), "$1, $2")
+        .replace(new RegExp(`(^|[.!?]\\s+)(${introductoryWords})(?=$|\\s|[,.;:!?])`, "giu"), "$1$2")
+        .replace(new RegExp(`(${introductoryWords})\\s+([^,.;:!?\\s])`, "giu"), "$1, $2")
+        .replace(/([^\s,.;:!?])\s+(то есть)(?=$|\s|[,.;:!?])/giu, "$1, $2")
+        .replace(/([^\s,.;:!?])\s+(__protected_\d+__)(?=$|\s|[,.;:!?])/giu, "$1, $2")
+        .replace(new RegExp(`([^\\s,.;:!?])\\s+(${subordinateWords})(?=$|\\s|[,.;:!?])`, "giu"), "$1, $2")
+        .replace(new RegExp(`([^\\s,.;:!?])\\s+(${relativeWords})(?=$|\\s|[,.;:!?])`, "giu"), "$1, $2")
+        .replace(/(^|[.!?]\s+)(если[^.!?]*?)\s+(то)(?=$|\s|[,.;:!?])/giu, "$1$2, $3")
+        .replace(/([,;:]\s+)(если[^.!?]*?)\s+(то)(?=$|\s|[,.;:!?])/giu, "$1$2, $3");
+
+      text = protectedCompounds.restore(text);
+      text = cleanPunctuation(text)
+        .replace(/([,.;:!?])\1+/g, "$1")
+        .replace(/([.!?])\s*([.!?])+/g, "$1")
+        .replace(/,\s*([,.;:!?])/g, "$1")
+        .replace(/\s+-\s+/g, " - ");
+      text = capitalizeSentences(text);
+      if (!/[.!?]$/.test(text)) {
+        text += ".";
+      }
+      return text;
+    }
+
     function autoEditText(value, finalize = true) {
       let text = normalize(value);
       if (!text) return "";
@@ -553,7 +616,7 @@
 
     function setRecordingState(isRecording, focusEditor = false) {
       document.body.classList.toggle("recording", isRecording);
-      stateTextEl.textContent = isRecording ? "Слушаю" : "Пауза";
+      stateTextEl.textContent = isReviewing ? "Проверка" : (isRecording ? "Слушаю" : "Пауза");
       transcriptEl.readOnly = isRecording;
       updateDictionarySelection();
       if (!isRecording && focusEditor) {
@@ -643,6 +706,10 @@
       instance.onend = () => {
         startBtn.disabled = false;
         stopBtn.disabled = true;
+        if (isReviewing) {
+          startBtn.disabled = true;
+          return;
+        }
         if (shouldRun) {
           setRecordingState(false);
           window.setTimeout(() => {
@@ -663,6 +730,7 @@
     }
 
     function startRecognition() {
+      if (isReviewing) return;
       if (!recognition) recognition = createRecognition();
       if (!recognition) return;
 
@@ -683,10 +751,48 @@
     }
 
     function toggleRecognition() {
+      if (isReviewing) return;
       shouldRun ? stopRecognition() : startRecognition();
     }
 
-    async function finishDictation() {
+    function enterReviewMode(text) {
+      isReviewing = true;
+      shouldRun = false;
+      finalText = text;
+      interimText = "";
+      transcriptEl.value = text;
+      transcriptEl.readOnly = false;
+      document.body.classList.remove("recording");
+      stateTextEl.textContent = "Проверка";
+      startBtn.disabled = true;
+      stopBtn.disabled = true;
+      doneBtn.disabled = false;
+      doneBtn.textContent = "Скопировать";
+      doneBtn.setAttribute("aria-label", "Скопировать проверенный текст и закрыть окно");
+      enterHintEl.textContent = "копировать";
+      backBtn.hidden = false;
+      setStatus("Текст проверен. Проверьте результат и нажмите «Скопировать».", "ok");
+      transcriptEl.focus();
+      transcriptEl.setSelectionRange(transcriptEl.value.length, transcriptEl.value.length);
+      updateDictionarySelection();
+    }
+
+    function leaveReviewMode() {
+      isReviewing = false;
+      finalText = autoEditText(transcriptEl.value, false);
+      interimText = "";
+      doneBtn.textContent = "Готово";
+      doneBtn.setAttribute("aria-label", "Проверить текст перед копированием");
+      enterHintEl.textContent = "готово";
+      backBtn.hidden = true;
+      setRecordingState(false, true);
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+      renderTranscript();
+      setStatus("Можно отредактировать текст или продолжить диктовку.", "ok");
+    }
+
+    function prepareReview() {
       const text = fullTranscript();
       if (!text) {
         setStatus("Пока нечего копировать.", "error");
@@ -694,6 +800,16 @@
       }
 
       stopRecognition();
+      enterReviewMode(finalRussianReview(text));
+    }
+
+    async function copyReviewedText() {
+      const text = normalize(transcriptEl.value);
+      if (!text) {
+        setStatus("Пока нечего копировать.", "error");
+        return;
+      }
+
       doneBtn.disabled = true;
       setStatus("Копирую текст в буфер обмена...", "ok");
       try {
@@ -706,9 +822,18 @@
       }
     }
 
+    function finishDictation() {
+      if (isReviewing) {
+        copyReviewedText();
+        return;
+      }
+      prepareReview();
+    }
+
     startBtn.addEventListener("click", startRecognition);
     stopBtn.addEventListener("click", stopRecognition);
     doneBtn.addEventListener("click", finishDictation);
+    backBtn.addEventListener("click", leaveReviewMode);
     addDictionaryBtn.addEventListener("click", addSelectedTermToDictionary);
     clearDictionaryBtn.addEventListener("click", clearDictionary);
     transcriptEl.addEventListener("select", updateDictionarySelection);
