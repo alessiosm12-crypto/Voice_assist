@@ -176,6 +176,28 @@
       color: #667085;
     }
 
+    .dictionary-tools {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-top: 10px;
+    }
+
+    .dictionary-tools button {
+      min-height: 34px;
+      border-radius: 8px;
+      font-size: 13px;
+      padding: 0 10px;
+    }
+
+    .dictionary-count {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 650;
+      margin-right: auto;
+    }
+
     .hint {
       display: flex;
       flex-wrap: wrap;
@@ -239,6 +261,12 @@
 
     <textarea id="transcript" aria-live="polite" placeholder="Текст появится здесь..." readonly></textarea>
 
+    <div class="dictionary-tools" aria-label="Пользовательский словарь">
+      <button id="addDictionary" class="primary" type="button" hidden>В словарь</button>
+      <span id="dictionaryCount" class="dictionary-count">Словарь: 0</span>
+      <button id="clearDictionary" type="button" disabled>Очистить словарь</button>
+    </div>
+
     <div class="hint" aria-label="Горячие клавиши">
       <span><kbd>Space</kbd> пауза/старт</span>
       <span><kbd>Enter</kbd> готово</span>
@@ -253,14 +281,173 @@
     const startBtn = document.querySelector("#start");
     const stopBtn = document.querySelector("#stop");
     const doneBtn = document.querySelector("#done");
+    const addDictionaryBtn = document.querySelector("#addDictionary");
+    const clearDictionaryBtn = document.querySelector("#clearDictionary");
+    const dictionaryCountEl = document.querySelector("#dictionaryCount");
+    const DICTIONARY_STORAGE_KEY = "voiceAssist.dictionary.v1";
 
     let recognition = null;
     let shouldRun = false;
     let finalText = "";
     let interimText = "";
+    let dictionaryTerms = loadDictionary();
 
     function normalize(value) {
       return value.replace(/\s+/g, " ").trim();
+    }
+
+    function normalizeDictionaryTerm(value) {
+      return normalize(value);
+    }
+
+    function normalizeForDictionaryMatch(value) {
+      return value
+        .toLowerCase()
+        .replace(/ё/g, "е")
+        .replace(/[^\p{L}\p{N}\s]/gu, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    function compactDictionaryMatch(value) {
+      return normalizeForDictionaryMatch(value).replace(/\s+/g, "");
+    }
+
+    function loadDictionary() {
+      try {
+        const parsed = JSON.parse(localStorage.getItem(DICTIONARY_STORAGE_KEY) || "[]");
+        if (!Array.isArray(parsed)) return [];
+        const seen = new Set();
+        return parsed
+          .map((item) => typeof item === "string" ? normalizeDictionaryTerm(item) : "")
+          .filter((item) => {
+            const key = item.toLowerCase();
+            if (!item || seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
+      } catch {
+        return [];
+      }
+    }
+
+    function saveDictionary() {
+      try {
+        localStorage.setItem(DICTIONARY_STORAGE_KEY, JSON.stringify(dictionaryTerms));
+        return true;
+      } catch {
+        setStatus("Не удалось сохранить словарь в браузере.", "error");
+        return false;
+      }
+    }
+
+    function updateDictionaryUi() {
+      dictionaryCountEl.textContent = `Словарь: ${dictionaryTerms.length}`;
+      clearDictionaryBtn.disabled = dictionaryTerms.length === 0;
+      updateDictionarySelection();
+    }
+
+    function selectedDictionaryTerm() {
+      if (transcriptEl.readOnly) return "";
+      const selected = transcriptEl.value.slice(transcriptEl.selectionStart, transcriptEl.selectionEnd);
+      const term = normalizeDictionaryTerm(selected);
+      return /[\p{L}\p{N}]/u.test(term) ? term : "";
+    }
+
+    function updateDictionarySelection() {
+      addDictionaryBtn.hidden = !selectedDictionaryTerm();
+    }
+
+    function addSelectedTermToDictionary() {
+      const term = selectedDictionaryTerm();
+      if (!term) return;
+
+      const key = term.toLowerCase();
+      if (dictionaryTerms.some((item) => item.toLowerCase() === key)) {
+        setStatus(`Уже есть в словаре: ${term}`, "ok");
+        updateDictionarySelection();
+        return;
+      }
+
+      dictionaryTerms.push(term);
+      if (!saveDictionary()) {
+        dictionaryTerms.pop();
+        updateDictionaryUi();
+        return;
+      }
+      updateDictionaryUi();
+      setStatus(`Добавлено в словарь: ${term}`, "ok");
+      transcriptEl.focus();
+    }
+
+    function clearDictionary() {
+      if (!dictionaryTerms.length) return;
+      if (!window.confirm("Очистить весь пользовательский словарь?")) return;
+      const previousTerms = dictionaryTerms;
+      dictionaryTerms = [];
+      if (!saveDictionary()) {
+        dictionaryTerms = previousTerms;
+        updateDictionaryUi();
+        return;
+      }
+      updateDictionaryUi();
+      setStatus("Словарь очищен.", "ok");
+      transcriptEl.focus();
+    }
+
+    function similarity(left, right) {
+      if (!left || !right) return 0;
+      const rows = Array.from({ length: left.length + 1 }, (_, index) => index);
+      for (let i = 1; i <= right.length; i += 1) {
+        let previous = rows[0];
+        rows[0] = i;
+        for (let j = 1; j <= left.length; j += 1) {
+          const current = rows[j];
+          const cost = left[j - 1] === right[i - 1] ? 0 : 1;
+          rows[j] = Math.min(rows[j] + 1, rows[j - 1] + 1, previous + cost);
+          previous = current;
+        }
+      }
+      const distance = rows[left.length];
+      return 1 - distance / Math.max(left.length, right.length);
+    }
+
+    function wordMatches(value) {
+      return Array.from(value.matchAll(/[\p{L}\p{N}]+(?:-[\p{L}\p{N}]+)*/gu));
+    }
+
+    function applyDictionary(value) {
+      if (!dictionaryTerms.length || !value) return value;
+
+      let result = value;
+      const terms = [...dictionaryTerms].sort((a, b) => b.length - a.length);
+      for (const term of terms) {
+        const normalizedTerm = normalizeForDictionaryMatch(term);
+        if (normalizedTerm.length < 4) continue;
+
+        const termWords = normalizedTerm.split(" ");
+        const windowSizes = Array.from(new Set([termWords.length - 1, termWords.length, termWords.length + 1]))
+          .filter((size) => size > 0);
+        const threshold = termWords.length === 1 ? 0.86 : 0.78;
+
+        for (const windowSize of windowSizes) {
+          const words = wordMatches(result);
+          for (let index = words.length - windowSize; index >= 0; index -= 1) {
+            const first = words[index];
+            const last = words[index + windowSize - 1];
+            const candidate = result.slice(first.index, last.index + last[0].length);
+            const normalizedCandidate = normalizeForDictionaryMatch(candidate);
+            if (normalizedCandidate.length < 4) continue;
+            const spacedScore = similarity(normalizedCandidate, normalizedTerm);
+            const compactScore = similarity(compactDictionaryMatch(candidate), compactDictionaryMatch(term));
+            if (Math.max(spacedScore, compactScore) < threshold) continue;
+
+            result = `${result.slice(0, first.index)}${term}${result.slice(last.index + last[0].length)}`;
+          }
+        }
+      }
+
+      return result;
     }
 
     function capitalizeSentences(value) {
@@ -341,6 +528,7 @@
       let text = normalize(value);
       if (!text) return "";
 
+      text = applyDictionary(text);
       text = cleanPunctuation(text);
       text = addSoftBreaksBeforeCapitals(text);
       text = addRussianCommas(text);
@@ -353,7 +541,7 @@
     }
 
     function appendFinalPhrase(phrase) {
-      const cleanPhrase = normalize(phrase);
+      const cleanPhrase = normalize(applyDictionary(phrase));
       if (!cleanPhrase) return;
       if (!finalText) {
         finalText = cleanPhrase;
@@ -367,6 +555,7 @@
       document.body.classList.toggle("recording", isRecording);
       stateTextEl.textContent = isRecording ? "Слушаю" : "Пауза";
       transcriptEl.readOnly = isRecording;
+      updateDictionarySelection();
       if (!isRecording && focusEditor) {
         transcriptEl.focus();
         transcriptEl.setSelectionRange(transcriptEl.value.length, transcriptEl.value.length);
@@ -431,7 +620,7 @@
           if (event.results[i].isFinal) {
             appendFinalPhrase(part);
           } else {
-            interimText = part;
+            interimText = applyDictionary(part);
           }
         }
         renderTranscript();
@@ -520,6 +709,15 @@
     startBtn.addEventListener("click", startRecognition);
     stopBtn.addEventListener("click", stopRecognition);
     doneBtn.addEventListener("click", finishDictation);
+    addDictionaryBtn.addEventListener("click", addSelectedTermToDictionary);
+    clearDictionaryBtn.addEventListener("click", clearDictionary);
+    transcriptEl.addEventListener("select", updateDictionarySelection);
+    transcriptEl.addEventListener("keyup", updateDictionarySelection);
+    transcriptEl.addEventListener("mouseup", updateDictionarySelection);
+    transcriptEl.addEventListener("input", () => {
+      finalText = autoEditText(transcriptEl.value, false);
+      updateDictionarySelection();
+    });
 
     window.addEventListener("keydown", (event) => {
       if (event.isComposing) return;
@@ -541,6 +739,7 @@
     });
 
     setRecordingState(false);
+    updateDictionaryUi();
 
     if (!SpeechRecognition) {
       setStatus("В этом браузере нет Web Speech API. Откройте окно в Chrome или Edge.", "error");

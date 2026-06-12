@@ -20,6 +20,8 @@ Inside the dictation window, `Space` toggles recognition. When paused, the trans
 
 Voice assist automatically formats Russian text: it normalizes spacing, adds sentence punctuation, capitalizes sentence starts, and adds basic commas for common Russian punctuation patterns: introductory words, adversative conjunctions, explanatory turns, compound subordinating conjunctions, subordinate clauses, and `который` forms. Short recognized fragments are joined softly with commas or spaces instead of being split into many tiny sentences. It does not replace dictated words.
 
+Voice assist also has a local user dictionary for names, companies, and domain terms. Pause dictation, select the corrected word or phrase in the transcript, then click `В словарь`. Saved terms are stored in this browser with `localStorage` and are used as conservative post-processing for similar recognized words. This does not train or change the browser Web Speech API model.
+
 ## Notes
 
 - Voice recognition uses the browser Web Speech API.
